@@ -34,6 +34,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.13",
     "otpauth": "^9.2.4",
+    "pg": "^8.16.3",
     "pug": "^3.0.2",
     "request": "^2.88.2",
     "secure-compare": "^3.0.1",

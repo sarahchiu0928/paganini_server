@@ -6,14 +6,33 @@ import 'dotenv/config.js'
 import applyModels from '#db-helpers/sequelize/models-setup.js'
 
 // 資料庫連結資訊
+// for mysql
+// const sequelize = new Sequelize(
+//   process.env.DB_DATABASE,
+//   process.env.DB_USERNAME,
+//   process.env.DB_PASSWORD,
+//   {
+//     host: process.env.DB_HOST,
+//     port: process.env.DB_PORT,
+//     dialect: 'mysql',
+//     logging: false,
+//     timezone: '+08:00',
+//     define: {
+//       freezeTableName: true,
+//       charset: 'utf8',
+//       collate: 'utf8_general_ci',
+//     },
+//   }
+// )
+// for postgresql test
 const sequelize = new Sequelize(
-  process.env.DB_DATABASE,
-  process.env.DB_USERNAME,
-  process.env.DB_PASSWORD,
+  process.env.PG_DB_DATABASE,
+  process.env.PG_DB_USERNAME,
+  process.env.PG_DB_PASSWORD,
   {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'mysql',
+    host: process.env.PG_DB_HOST,
+    port: process.env.PG_DB_PORT,
+    dialect: 'postgres',
     logging: false,
     timezone: '+08:00',
     define: {
@@ -23,23 +42,6 @@ const sequelize = new Sequelize(
     },
   }
 )
-// for postgresql test
-// const sequelize = new Sequelize(
-//   process.env.PG_DB_DATABASE,
-//   process.env.PG_DB_USERNAME,
-//   process.env.PG_DB_PASSWORD,
-//   {
-//     host: process.env.PG_DB_HOST,
-//     port: process.env.PG_DB_PORT,
-//     dialect: 'postgres',
-//     logging: false,
-//     define: {
-//       freezeTableName: true,
-//       charset: 'utf8',
-//       collate: 'utf8_general_ci',
-//     },
-//   }
-// )
 
 // 啟動時測試連線
 sequelize
