@@ -23,7 +23,7 @@ router.get('/', async function (req, res) {
     const offset = (validatedPage - 1) * validatedLimit
 
     // 构建基础查询
-    let sqlSelect = `SELECT 
+    let sqlSelect = `SELECT
       blog.id,
       blog.user_id,
       blog.category_id,
@@ -34,11 +34,11 @@ router.get('/', async function (req, res) {
       blog.updated_at,
       blog.state,
       blog.cover_img_url,
-      user.member_name AS author_name,
+      "user".member_name AS author_name,
       blog_category.name AS category_name
-    FROM blog
-    LEFT JOIN user ON blog.user_id = user.id
-    LEFT JOIN blog_category ON blog.category_id = blog_category.id`
+    FROM "blog"
+    LEFT JOIN "user" ON blog.user_id = "user".id
+    LEFT JOIN "blog_category" ON blog.category_id = blog_category.id`
 
     // 构建 WHERE 条件
     const conditions = []
@@ -47,8 +47,8 @@ router.get('/', async function (req, res) {
     // 搜索条件
     if (search?.trim()) {
       conditions.push(`(
-        blog.title LIKE ? OR 
-        blog.content LIKE ? 
+        blog.title ILIKE $${params.length + 1} OR
+        blog.content ILIKE $${params.length + 2}
       )`)
       const searchTerm = `%${search.trim()}%`
       params.push(searchTerm, searchTerm)
@@ -56,7 +56,7 @@ router.get('/', async function (req, res) {
 
     // 类别条件
     if (category) {
-      conditions.push(`blog_category.name = ?`) // 使用类别名称
+      conditions.push(`blog_category.name = $${params.length + 1}`) // 使用类别名称
       params.push(category)
     }
 
@@ -72,12 +72,12 @@ router.get('/', async function (req, res) {
     sqlSelect += ` ORDER BY blog.id ${order === 'ASC' ? 'ASC' : 'DESC'}`
 
     // 添加分页
-    sqlSelect += ` LIMIT ? OFFSET ?`
+    sqlSelect += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
     params.push(validatedLimit, offset)
 
     // 执行主查询
     const blogs = await sequelize.query(sqlSelect, {
-      replacements: params,
+      bind: params,
       type: sequelize.QueryTypes.SELECT,
     })
 
@@ -93,23 +93,23 @@ router.get('/', async function (req, res) {
     }
 
     // 计算符合条件的总博客数
-    const sqlCount = `SELECT COUNT(DISTINCT blog.id) as total_count
-      FROM blog
-      LEFT JOIN user ON blog.user_id = user.id
-      LEFT JOIN blog_category ON blog.category_id = blog_category.id
+    const sqlCount = `SELECT COUNT(DISTINCT blog.id)::integer as total_count
+      FROM "blog"
+      LEFT JOIN "user" ON blog.user_id = "user".id
+      LEFT JOIN "blog_category" ON blog.category_id = blog_category.id
       ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}`
     const [countResult] = await sequelize.query(sqlCount, {
-      replacements: params.slice(0, params.length - 2),
+      bind: params.slice(0, params.length - 2),
       type: sequelize.QueryTypes.SELECT,
     })
 
     // 获取分类文章数量（排除已删除的文章）
     const categoryCountSql = `
-      SELECT 
+      SELECT
         bc.name AS category_name,
-        COUNT(b.id) AS blog_count
-      FROM blog_category bc
-      LEFT JOIN blog b ON b.category_id = bc.id
+        COUNT(b.id)::integer AS blog_count
+      FROM "blog_category" bc
+      LEFT JOIN "blog" b ON b.category_id = bc.id
       WHERE b.state != 0  -- 排除已删除的文章
       GROUP BY bc.id, bc.name
     `
@@ -176,13 +176,13 @@ router.get('/:id', async function (req, res) {
         blog.content,
         blog.created_at,
         blog.updated_at,
-        user.member_name AS author_name,
+        "user".member_name AS author_name,
         blog_category.name AS category_name,
         blog.cover_img_url,
         blog.state  -- 假设数据库表中有一个state字段
-      FROM blog
-      JOIN user ON blog.user_id = user.ID
-      JOIN blog_category ON blog.category_id = blog_category.id
+      FROM "blog"
+      JOIN "user" ON blog.user_id = "user".id
+      JOIN "blog_category" ON blog.category_id = blog_category.id
       WHERE blog.id = :blogId AND blog.state != 0  -- 仅查询状态不为0的文章
     `
 
@@ -206,14 +206,14 @@ router.get('/:id', async function (req, res) {
     // 获取上一篇和下一篇的部落格
     const prevBlogQuery = `
       SELECT title, id
-      FROM blog
+      FROM "blog"
       WHERE id < :blogId AND state != 0  -- 确保上一篇文章的状态也不是0
       ORDER BY id DESC
       LIMIT 1
     `
     const nextBlogQuery = `
       SELECT title, id
-      FROM blog
+      FROM "blog"
       WHERE id > :blogId AND state != 0  -- 确保下一篇文章的状态也不是0
       ORDER BY id ASC
       LIMIT 1
