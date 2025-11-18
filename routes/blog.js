@@ -6,26 +6,6 @@ import authenticate from '#middlewares/authenticate.js' // 確保這個中介軟
 // 資料庫連線
 import sequelize from '#configs/db.js'
 
-// import multer from 'multer'
-// import path from 'path'
-// import { fileURLToPath } from 'url'
-
-// const __filename = fileURLToPath(import.meta.url)
-// const __dirname = path.dirname(__filename)
-// // upload image
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, 'public/blog')
-//   },
-//   filename: (req, file, cb) => {
-//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-//     cb(null, 'blog_cover' + uniqueSuffix + path.extname(file.originalname))
-//   },
-// })
-// const upload = multer({ storage: storage })
-
-// router.use('/blog', express.static(path.join(__dirname, 'public/blog')))
-
 // GET - 獲取所有部落格文章
 router.get('/', async function (req, res) {
   try {

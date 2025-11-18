@@ -18,18 +18,18 @@ router.get('/', async function (req, res) {
 
   // 建立動態 SQL 查詢語句
   let baseQuery = `
-    SELECT 
-      product.id, 
-      product.product_name, 
-      product.price, 
-      product.discount_price, 
-      product.description, 
-      product_category.name AS category_name, 
+    SELECT
+      product.id,
+      product.product_name,
+      product.price,
+      product.discount_price,
+      product.description,
+      product_category.name AS category_name,
       product_brand.name AS brand_name,
-      GROUP_CONCAT(DISTINCT product_picture.picture_url ORDER BY product_picture.id ASC) AS pictures,
-      CASE 
-        WHEN COUNT(product_size.size) = 0 THEN MAX(product_size.stock)  
-        ELSE GROUP_CONCAT(DISTINCT CONCAT(product_size.size, ':', product_size.stock))
+      STRING_AGG(DISTINCT product_picture.picture_url, ',' ORDER BY product_picture.picture_url) AS pictures,
+      CASE
+        WHEN COUNT(product_size.size) = 0 THEN MAX(product_size.stock)::text
+        ELSE STRING_AGG(DISTINCT product_size.size || ':' || product_size.stock, ',' ORDER BY product_size.size || ':' || product_size.stock)
       END AS sizes
     FROM product
     JOIN product_brand ON product.brand_id = product_brand.id
@@ -53,20 +53,24 @@ router.get('/', async function (req, res) {
 
   if (search) {
     conditions.push(`(
-      product.product_name LIKE :search OR 
-      product_brand.name LIKE :search OR 
-      product_category.name LIKE :search
+      product.product_name ILIKE :search OR
+      product_brand.name ILIKE :search OR
+      product_category.name ILIKE :search
     )`)
     replacements.search = `%${search}%`
   }
 
   if (req.query.minPrice) {
-    conditions.push(`COALESCE(product.discount_price, product.price) >= :minPrice`)
+    conditions.push(
+      `COALESCE(product.discount_price, product.price) >= :minPrice`
+    )
     replacements.minPrice = parseInt(req.query.minPrice, 10)
   }
-  
+
   if (req.query.maxPrice) {
-    conditions.push(`COALESCE(product.discount_price, product.price) <= :maxPrice`)
+    conditions.push(
+      `COALESCE(product.discount_price, product.price) <= :maxPrice`
+    )
     replacements.maxPrice = parseInt(req.query.maxPrice, 10)
   }
 
@@ -75,9 +79,11 @@ router.get('/', async function (req, res) {
   }
 
   // 加入 GROUP BY 和 ORDER BY 條件
-  baseQuery += ` GROUP BY product.id`
-  if (sort === 'priceAsc') baseQuery += ` ORDER BY COALESCE(product.discount_price, product.price) ASC`
-  else if (sort === 'priceDesc') baseQuery += ` ORDER BY COALESCE(product.discount_price, product.price) DESC`
+  baseQuery += ` GROUP BY product.id, product.product_name, product.price, product.discount_price, product.description, product_category.name, product_brand.name`
+  if (sort === 'priceAsc')
+    baseQuery += ` ORDER BY COALESCE(product.discount_price, product.price) ASC`
+  else if (sort === 'priceDesc')
+    baseQuery += ` ORDER BY COALESCE(product.discount_price, product.price) DESC`
   else if (sort === 'newest') baseQuery += ` ORDER BY product.id DESC`
   else if (sort === 'oldest') baseQuery += ` ORDER BY product.id ASC`
 
@@ -94,7 +100,7 @@ router.get('/', async function (req, res) {
 
     // 查詢符合條件的資料總數量
     const countQuery = `
-      SELECT COUNT(DISTINCT product.id) as count 
+      SELECT COUNT(DISTINCT product.id)::integer as count
       FROM product
       JOIN product_brand ON product.brand_id = product_brand.id
       JOIN product_category ON product.category_id = product_category.id
@@ -108,7 +114,7 @@ router.get('/', async function (req, res) {
 
     // 查詢所有商品的總數量（不帶篩選條件）
     const overallCountQuery = `
-    SELECT COUNT(DISTINCT product.id) as count 
+    SELECT COUNT(DISTINCT product.id)::integer as count
     FROM product
 `
     const [overallCountResult] = await sequelize.query(overallCountQuery)
@@ -172,7 +178,7 @@ router.get('/categories-and-brands', async function (req, res) {
       data: {
         categories,
         brands,
-        priceRange: priceRange[0]
+        priceRange: priceRange[0],
       },
     })
   } catch (error) {
