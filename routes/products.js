@@ -195,20 +195,20 @@ router.get('/:id', async (req, res) => {
   try {
     // 使用原生 SQL 查詢指定 id 的商品
     const [product] = await sequelize.query(
-      `SELECT 
-        product.id, 
-        product.product_name, 
-        product.price, 
-        product.discount_price, 
-        product.description, 
-        product_category.name AS category_name, 
+      `SELECT
+        product.id,
+        product.product_name,
+        product.price,
+        product.discount_price,
+        product.description,
+        product_category.name AS category_name,
         product_brand.name AS brand_name,
-        GROUP_CONCAT(DISTINCT product_picture.picture_url ORDER BY product_picture.id ASC) AS pictures,
-        GROUP_CONCAT(
-          DISTINCT CASE 
-            WHEN product_size.size IS NOT NULL AND product_size.size != '' THEN CONCAT(product_size.size, ':', product_size.stock)
-            ELSE CAST(product_size.stock AS CHAR)
-          END
+        STRING_AGG(DISTINCT product_picture.picture_url, ',' ORDER BY product_picture.picture_url) AS pictures,
+        STRING_AGG(
+          DISTINCT CASE
+            WHEN product_size.size IS NOT NULL AND product_size.size != '' THEN product_size.size || ':' || product_size.stock
+            ELSE product_size.stock::text
+          END, ','
         ) AS sizes
       FROM product
       JOIN product_brand ON product.brand_id = product_brand.id
@@ -216,7 +216,7 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN product_picture ON product.id = product_picture.product_id
       LEFT JOIN product_size ON product.id = product_size.product_id
       WHERE product.id = ?
-      GROUP BY product.id;
+      GROUP BY product.id, product.product_name, product.price, product.discount_price, product.description, product_category.name, product_brand.name;
 `,
       {
         replacements: [id], // 用戶輸入的 id 替換進查詢語句中
@@ -243,7 +243,7 @@ router.get('/recommend/:id', async (req, res) => {
     // 先獲取當前商品的類別和品牌
     const [currentProduct] = await sequelize.query(
       `
-      SELECT 
+      SELECT
         product.category_id,
         product.brand_id
       FROM product
@@ -270,15 +270,15 @@ router.get('/recommend/:id', async (req, res) => {
           product.price, 
           product.discount_price,
           product_brand.name AS brand_name,
-          GROUP_CONCAT(DISTINCT product_picture.picture_url ORDER BY product_picture.id ASC) AS pictures
+          STRING_AGG(DISTINCT product_picture.picture_url, ',' ORDER BY product_picture.picture_url) AS pictures
         FROM product
         JOIN product_brand ON product.brand_id = product_brand.id
         LEFT JOIN product_picture ON product.id = product_picture.product_id
         WHERE product.category_id = :category_id 
         AND product.brand_id = :brand_id
         AND product.id != :product_id
-        GROUP BY product.id
-        ORDER BY RAND()
+        GROUP BY product.id, product.product_name, product.price, product.discount_price, product_brand.name
+        ORDER BY RANDOM()
         LIMIT 4
       )
       UNION
@@ -290,15 +290,15 @@ router.get('/recommend/:id', async (req, res) => {
           product.price, 
           product.discount_price,
           product_brand.name AS brand_name,
-          GROUP_CONCAT(DISTINCT product_picture.picture_url ORDER BY product_picture.id ASC) AS pictures
+          STRING_AGG(DISTINCT product_picture.picture_url, ',' ORDER BY product_picture.picture_url) AS pictures
         FROM product
         JOIN product_brand ON product.brand_id = product_brand.id
         LEFT JOIN product_picture ON product.id = product_picture.product_id
         WHERE product.category_id = :category_id 
         AND product.brand_id != :brand_id
         AND product.id != :product_id
-        GROUP BY product.id
-        ORDER BY RAND()
+        GROUP BY product.id, product.product_name, product.price, product.discount_price, product_brand.name
+        ORDER BY RANDOM()
       )
       LIMIT 4
     `,
