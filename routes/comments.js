@@ -189,27 +189,27 @@ router.get('/check/:product_id/:size', authenticate, async (req, res) => {
 
 // POST - 新增或更新評價資料
 router.post('/add', authenticate, async (req, res) => {
-  const user_id = req.user.id;
-  const { product_id, rating, comment } = req.body;
-  let { size } = req.body;
+  const user_id = req.user.id
+  const { product_id, rating, comment } = req.body
+  let { size } = req.body
 
   try {
     if (!product_id || !rating || typeof comment !== 'string') {
       return res.status(400).json({
         status: 'error',
         message: '商品ID、評分和評價內容為必填欄位',
-      });
+      })
     }
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({
         status: 'error',
         message: '評分必須介於 1 到 5 分之間',
-      });
+      })
     }
 
     // 處理 size，空值轉為 ''
-    size = size || '';
+    size = size || ''
 
     // 確認該商品是否存在於會員的歷史訂單中
     const [orderHistory] = await sequelize.query(
@@ -225,13 +225,13 @@ router.post('/add', authenticate, async (req, res) => {
         replacements: { user_id, product_id, size },
         type: sequelize.QueryTypes.SELECT,
       }
-    );
+    )
 
     if (!orderHistory) {
       return res.status(400).json({
         status: 'error',
         message: '您尚未購買過該商品，無法評價',
-      });
+      })
     }
 
     // 檢查是否已有評價
@@ -247,7 +247,7 @@ router.post('/add', authenticate, async (req, res) => {
         replacements: { user_id, product_id, size },
         type: sequelize.QueryTypes.SELECT,
       }
-    );
+    )
 
     if (existingComment) {
       // 更新評價
@@ -263,12 +263,12 @@ router.post('/add', authenticate, async (req, res) => {
           replacements: { user_id, product_id, size, rating, comment },
           type: sequelize.QueryTypes.UPDATE,
         }
-      );
+      )
 
       return res.json({
         status: 'success',
         message: '評價已成功更新',
-      });
+      })
     } else {
       // 新增評價
       await sequelize.query(
@@ -280,22 +280,21 @@ router.post('/add', authenticate, async (req, res) => {
           replacements: { product_id, size, user_id, rating, comment },
           type: sequelize.QueryTypes.INSERT,
         }
-      );
+      )
 
       return res.json({
         status: 'success',
         message: '評價已成功新增',
-      });
+      })
     }
   } catch (error) {
-    console.error('評價處理錯誤:', error);
+    console.error('評價處理錯誤:', error)
     return res.status(500).json({
       status: 'error',
       message: '無法處理評價，請稍後再試',
-    });
+    })
   }
-});
-
+})
 
 // GET - 根據商品 ID 獲取評價列表
 router.get('/product/:product_id', async (req, res) => {
@@ -316,15 +315,15 @@ router.get('/product/:product_id', async (req, res) => {
     // 查詢評論
     const comments = await sequelize.query(
       `
-      SELECT 
-        mc.id, 
-        mc.product_id, 
-        u.account AS nickname, 
-        mc.rating, 
-        mc.comment, 
+      SELECT
+        mc.id,
+        mc.product_id,
+        u.account AS nickname,
+        mc.rating,
+        mc.comment,
         mc.created_at
-      FROM member_comment mc
-      JOIN user u ON mc.user_id = u.id
+      FROM "member_comment" mc
+      JOIN "user" u ON mc.user_id = u.id
       WHERE mc.product_id = :product_id
       ${orderBy}
       `,
@@ -337,10 +336,10 @@ router.get('/product/:product_id', async (req, res) => {
     // 計算平均評分和評論總數
     const [summary] = await sequelize.query(
       `
-      SELECT 
-        AVG(mc.rating) AS averageRating, 
-        COUNT(mc.id) AS totalReviews
-      FROM member_comment mc
+      SELECT
+        AVG(mc.rating)::numeric(10,2) AS averageRating,
+        COUNT(mc.id)::integer AS totalReviews
+      FROM "member_comment" mc
       WHERE mc.product_id = :product_id
       `,
       {
