@@ -103,7 +103,7 @@ router.post('/', async (req, res, next) => {
 
     for (const couponId of couponIds) {
       await db.query(
-        'INSERT INTO member_coupon (user_id, coupon_id, status, claimed_at, expiration_date) VALUES (?, ?, ?, ?, DATE_ADD(CURRENT_DATE, INTERVAL 90 DAY))',
+        'INSERT INTO member_coupon (user_id, coupon_id, status, claimed_at, expiration_date) VALUES (?, ?, ?, ?, CURRENT_DATE + INTERVAL \'90 days\')',
         [userId, couponId, 2, claimedAt]
       )
     }

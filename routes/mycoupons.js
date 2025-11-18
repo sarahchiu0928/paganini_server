@@ -16,7 +16,7 @@ router.get('/', authenticate, async function (req, res) {
       UPDATE member_coupon
       SET status = 4
       WHERE ((expiration_date < CURRENT_DATE OR coupon_id IN (
-        SELECT id FROM coupon WHERE end_date < CURRENT_DATE AND end_date != '0000-00-00'
+        SELECT id FROM coupon WHERE end_date < CURRENT_DATE AND end_date IS NOT NULL AND end_date != '1970-01-01'
        ))) AND status != 4 AND status != 3 AND user_id = ?
     `, {
       replacements: [userId]

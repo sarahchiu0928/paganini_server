@@ -16,7 +16,7 @@ router.get('/', authenticate, async (req, res) => {
     const favorites = await sequelize.query(
       `SELECT p.id AS product_id, 
        p.product_name, 
-       IFNULL(p.discount_price, p.price) AS display_price,
+       COALESCE(p.discount_price, p.price) AS display_price,
        pb.name AS brand_name, 
        product_picture.picture_url AS first_picture
       FROM product_like AS pl
@@ -90,7 +90,9 @@ router.delete('/:id', authenticate, async (req, res, next) => {
     );
 
     // 修改這裡的判斷條件
-    if (!result || result[0].affectedRows === 0) {
+    // PostgreSQL 中 Sequelize 的 DELETE 返回值格式不同
+    const affectedRows = result?.[1] || result?.[0]?.rowCount || 0
+    if (!result || affectedRows === 0) {
       return res.json({
         status: 'success', // 即使沒有刪除任何資料也回傳成功
         data: null,

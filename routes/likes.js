@@ -72,7 +72,9 @@ router.delete('/:id', authenticate, async (req, res) => {
       { replacements: [course_id, uid] }
     )
 
-    if (result.affectedRows === 0) {
+    // PostgreSQL 中 Sequelize 的 DELETE 返回值格式不同
+    const affectedRows = result?.[1] || result?.[0]?.rowCount || 0
+    if (affectedRows === 0) {
       return res.json({
         status: 'error',
         message: '刪除失敗',

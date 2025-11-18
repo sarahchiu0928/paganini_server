@@ -15,7 +15,7 @@ const updateDeliveryStatus = async () => {
           delivery_status = 1,
           payment_status = 1
       WHERE 
-          come_date < CURDATE() 
+          come_date < CURRENT_DATE 
           AND (delivery_status != 1 OR payment_status != 1);
 
       `,
@@ -128,7 +128,7 @@ router.get('/ongoing', authenticate, async (req, res) => {
        shop.shop_opentime
       FROM orders
       LEFT JOIN shop ON orders.shop_id = shop.id
-      WHERE orders.user_id = :user_id && delivery_status = 0
+      WHERE orders.user_id = :user_id AND delivery_status = 0
       ORDER BY orders.order_id DESC; -- 降序排序
     `,
       {
@@ -170,7 +170,7 @@ router.get('/history', authenticate, async (req, res) => {
        shop.shop_opentime
       FROM orders
       LEFT JOIN shop ON orders.shop_id = shop.id
-      WHERE orders.user_id = :user_id  && delivery_status = 1
+      WHERE orders.user_id = :user_id AND delivery_status = 1
       ORDER BY orders.order_id DESC; -- 降序排序
     `,
       {
@@ -332,12 +332,13 @@ router.post('/add', authenticate, async (req, res) => {
     const paymentStatus = payment_method === '信用卡' ? 1 : 0
 
     // Step 5: 建立新訂單資料
+    // PostgreSQL 使用 RETURNING 子句來取得插入的 ID
     const [orderInsertResult] = await sequelize.query(
       `INSERT INTO orders 
     (user_id, coupon_id, total_amount, shipping_person, shipping_phone, delivery_method, 
     delivery_address, shop_id, come_date, payment_method, card_number, card_holder, 
     expiry_date, security_code, payment_status) 
-  VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING order_id`,
       {
         replacements: [
           user_id,
@@ -356,16 +357,13 @@ router.post('/add', authenticate, async (req, res) => {
           security_code,
           paymentStatus,
         ],
-        type: sequelize.QueryTypes.INSERT,
+        type: sequelize.QueryTypes.SELECT,
       }
     )
-    if (orderInsertResult === 0) throw new Error('訂單資料插入失敗')
+    if (!orderInsertResult || orderInsertResult.length === 0) throw new Error('訂單資料插入失敗')
 
     // Step 6: 取得剛才插入的 order_id
-    const [orderResult] = await sequelize.query(
-      `SELECT LAST_INSERT_ID() AS order_id`
-    )
-    const order_id = orderResult[0]?.order_id
+    const order_id = orderInsertResult[0]?.order_id
     if (!order_id) throw new Error('無法取得新訂單的 order_id')
     console.log('Order ID:', order_id)
 
