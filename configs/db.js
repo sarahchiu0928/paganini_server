@@ -40,6 +40,12 @@ const sequelize = new Sequelize(
       charset: 'utf8',
       collate: 'utf8_general_ci',
     },
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false, // 開發環境使用，生產環境建議設為 true 並提供正確的證書
+      },
+    },
   }
 )
 
