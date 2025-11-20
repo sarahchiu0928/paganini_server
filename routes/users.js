@@ -156,7 +156,13 @@ router.post('/login', async (req, res) => {
   })
 
   // 使用 httpOnly cookie 來讓瀏覽器端儲存 access token
-  res.cookie('accessToken', accessToken, { httpOnly: true })
+  // 跨域請求需要設定 sameSite: 'none' 和 secure: true
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // 生產環境使用 HTTPS 時設為 true
+    sameSite: 'none', // 允許跨域請求攜帶 cookie
+    maxAge: 3 * 24 * 60 * 60 * 1000, // 3 天，與 JWT 過期時間一致
+  })
 
   return res.json({
     status: 'success',
@@ -166,7 +172,12 @@ router.post('/login', async (req, res) => {
 
 // 登出用
 router.post('/logout', authenticate, (req, res) => {
-  res.clearCookie('accessToken', { httpOnly: true })
+  // 清除 cookie 時需要使用與設定時相同的選項
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none',
+  })
   res.json({ status: 'success', data: null })
 })
 
