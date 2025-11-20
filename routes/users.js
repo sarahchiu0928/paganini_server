@@ -1,7 +1,7 @@
 import express from 'express'
 const router = express.Router()
 
-// 資料庫使用，使用原本的 mysql2 + sql
+// 資料庫使用，使用原本的 mysql2 + sql -> 改為 pg
 import db from '##/configs/mysql.js'
 
 import jsonwebtoken from 'jsonwebtoken'
@@ -20,7 +20,9 @@ router.get('/', authenticate, async function (req, res) {
     return res.json({ status: 'error', message: '存取會員資料失敗' })
   }
 
-  const [rows] = await db.query('SELECT * FROM user WHERE ID = ?', [id])
+  // PG: 使用 $1, $2... 且解構 { rows }
+  // user 是保留字，需加雙引號
+  const { rows } = await db.query('SELECT * FROM "user" WHERE id = $1', [id])
 
   if (rows.length === 0) {
     return res.json({ status: 'error', message: '沒有找到會員資料' })
@@ -42,7 +44,7 @@ router.get('/:id', authenticate, async function (req, res) {
     return res.json({ status: 'error', message: '存取會員資料失敗' })
   }
 
-  const [rows] = await db.query('SELECT * FROM user WHERE ID = ?', [id])
+  const { rows } = await db.query('SELECT * FROM "user" WHERE id = $1', [id])
 
   if (rows.length === 0) {
     return res.json({ status: 'error', message: '沒有找到會員資料' })
@@ -51,7 +53,7 @@ router.get('/:id', authenticate, async function (req, res) {
   const user = rows[0]
   // 確保 gender 欄位存在，並提供一個默認值
   if (!user.gender) {
-    user.gender = '未指定'; // 或根據需求設置默認值
+    user.gender = '未指定' // 或根據需求設置默認值
   }
 
   // 不回傳密碼
@@ -61,14 +63,14 @@ router.get('/:id', authenticate, async function (req, res) {
 })
 
 // 會員註冊
-router.post('/', async (req, res, next) => {
+router.post('/', async (req, res) => {
   console.log(req.body)
 
   const newUser = req.body
 
   // 檢查是否有重覆的 email 或 account
-  const [rows] = await db.query(
-    'SELECT * FROM user WHERE email = ? OR account = ?',
+  const { rows } = await db.query(
+    'SELECT * FROM "user" WHERE email = $1 OR account = $2',
     [newUser.email, newUser.account]
   )
 
@@ -77,8 +79,10 @@ router.post('/', async (req, res, next) => {
   }
 
   // 直接使用明文密碼
-  const [rows2] = await db.query(
-    'INSERT INTO `user`(`member_name`, `account`, `password`, `email`, `gender`, `phone`, `birthdate`, `address`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  // PG: RETURNING id 以取得新增的 id (假設主鍵是 id)
+  // 移除了 MySQL 的反引號
+  const result = await db.query(
+    'INSERT INTO "user"("member_name", "account", "password", "email", "gender", "phone", "birthdate", "address") VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
     [
       newUser.member_name,
       newUser.account,
@@ -91,19 +95,18 @@ router.post('/', async (req, res, next) => {
     ]
   )
 
-  // 檢查是否有產生 insertId，代表新增成功
-  if (rows2.insertId) {
-    const userId = rows2.insertId
+  // 檢查是否有產生 id
+  if (result.rows.length > 0) {
+    const userId = result.rows[0].id
 
     // 註冊成功後自動分配兩張新會員優惠券(目前狀態一直呈現4，已過期)
     const couponIds = [32, 33]
     const claimedAt = new Date()
-    // const expirationDate = new Date();
-    // expirationDate.setDate(claimedAt.getDate() + 90);
 
+    // PG: 使用 CURRENT_DATE + INTERVAL '90 days' 語法是正確的
     for (const couponId of couponIds) {
       await db.query(
-        'INSERT INTO member_coupon (user_id, coupon_id, status, claimed_at, expiration_date) VALUES (?, ?, ?, ?, CURRENT_DATE + INTERVAL \'90 days\')',
+        "INSERT INTO member_coupon (user_id, coupon_id, status, claimed_at, expiration_date) VALUES ($1, $2, $3, $4, CURRENT_DATE + INTERVAL '90 days')",
         [userId, couponId, 2, claimedAt]
       )
     }
@@ -119,13 +122,13 @@ router.post('/', async (req, res, next) => {
 })
 
 // 登入用
-router.post('/login', async (req, res, next) => {
+router.post('/login', async (req, res) => {
   console.log(req.body)
 
   const loginUser = req.body
 
   // 1. 先用 account 查詢該會員
-  const [rows] = await db.query('SELECT * FROM user WHERE account = ?', [
+  const { rows } = await db.query('SELECT * FROM "user" WHERE account = $1', [
     loginUser.account,
   ])
 
@@ -143,7 +146,7 @@ router.post('/login', async (req, res, next) => {
   }
 
   const returnUser = {
-    id: dbUser.ID,
+    id: dbUser.id,
     account: dbUser.account,
   }
 
@@ -168,7 +171,7 @@ router.post('/logout', authenticate, (req, res) => {
 })
 
 // 更新會員資料
-router.put('/update-profile', authenticate, async (req, res, next) => {
+router.put('/update-profile', authenticate, async (req, res) => {
   const id = req.user.id // 獲取用戶 ID
   const updateUser = req.body // 獲取前端傳遞的資料
 
@@ -177,7 +180,7 @@ router.put('/update-profile', authenticate, async (req, res, next) => {
   if (updateUser.password) {
     // 如果需要更新密碼
     result = await db.query(
-      'UPDATE `user` SET `member_name` = ?, `password` = ?, `email` = ?, `gender` = ?, `phone` = ?, `birthdate` = ?, `address` = ? WHERE `ID` = ?;',
+      'UPDATE "user" SET "member_name" = $1, "password" = $2, "email" = $3, "gender" = $4, "phone" = $5, "birthdate" = $6, "address" = $7 WHERE id = $8',
       [
         updateUser.member_name,
         updateUser.password, // 密碼處理
@@ -192,7 +195,7 @@ router.put('/update-profile', authenticate, async (req, res, next) => {
   } else {
     // 如果不需要更新密碼
     result = await db.query(
-      'UPDATE `user` SET `member_name` = ?, `email` = ?, `gender` = ?, `phone` = ?, `birthdate` = ?, `address` = ? WHERE `ID` = ?;',
+      'UPDATE "user" SET "member_name" = $1, "email" = $2, "gender" = $3, "phone" = $4, "birthdate" = $5, "address" = $6 WHERE id = $7',
       [
         updateUser.member_name,
         updateUser.email,
@@ -205,13 +208,13 @@ router.put('/update-profile', authenticate, async (req, res, next) => {
     )
   }
 
-  const [rows2] = result
-
-  if (rows2.affectedRows > 0) {
+  // PG: 使用 rowCount 檢查影響行數
+  if (result.rowCount > 0) {
     // 更新成功後查詢最新會員資料
-    const [updatedRows] = await db.query('SELECT * FROM user WHERE ID = ?', [
-      id,
-    ])
+    const { rows: updatedRows } = await db.query(
+      'SELECT * FROM "user" WHERE id = $1',
+      [id]
+    )
 
     if (updatedRows.length > 0) {
       const updatedUser = updatedRows[0]
@@ -234,25 +237,29 @@ router.put('/update-profile', authenticate, async (req, res, next) => {
 
 router.post('/change-password', authenticate, async (req, res) => {
   try {
-    console.log('收到請求資料:', req.body); // 檢查請求資料
-    const { origin, new: newPassword } = req.body;
+    console.log('收到請求資料:', req.body) // 檢查請求資料
+    const { origin, new: newPassword } = req.body
 
-    const [rows] = await db.query('SELECT password FROM user WHERE id = ?', [req.user.id]);
-    console.log('查詢到的密碼:', rows);
+    const { rows } = await db.query(
+      'SELECT password FROM "user" WHERE id = $1',
+      [req.user.id]
+    )
+    console.log('查詢到的密碼:', rows)
 
     if (!rows.length || rows[0].password !== origin) {
-      return res.status(400).json({ status: 'error', message: '原密碼錯誤' });
+      return res.status(400).json({ status: 'error', message: '原密碼錯誤' })
     }
 
-    await db.query('UPDATE user SET password = ? WHERE id = ?', [newPassword, req.user.id]);
-    console.log('密碼更新成功');
-    res.json({ status: 'success', message: '密碼修改成功' });
+    await db.query('UPDATE "user" SET password = $1 WHERE id = $2', [
+      newPassword,
+      req.user.id,
+    ])
+    console.log('密碼更新成功')
+    res.json({ status: 'success', message: '密碼修改成功' })
   } catch (error) {
-    console.error('修改密碼時發生錯誤:', error);
-    res.status(500).json({ status: 'error', message: '伺服器錯誤' });
+    console.error('修改密碼時發生錯誤:', error)
+    res.status(500).json({ status: 'error', message: '伺服器錯誤' })
   }
-});
-
-
+})
 
 export default router
